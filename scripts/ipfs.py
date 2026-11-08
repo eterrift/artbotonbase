@@ -1,4 +1,4 @@
-"""Pin each days/<date>.png to IPFS (Pinata) and point days/<date>.json at ipfs://CID.
+"""Pin each days/<date>.png to IPFS (Pinata) and point days/<date>.json at a reliable gateway URL for the IPFS JPEG.
 
 Idempotent: days/ipfs.json maps date -> {cid, sha256 of the image}. A day is
 re-pinned only if its image bytes changed. Any Pinata error skips that day;
@@ -19,6 +19,7 @@ INDEX = DAYS / "ipfs.json"
 V3_URL = "https://uploads.pinata.cloud/v3/files"
 PIN_URL = "https://api.pinata.cloud/pinning/pinFileToIPFS"
 HTTPS = "https://therog1.github.io/artbotonbase/days/{date}.png"
+GATEWAY = "https://gateway.pinata.cloud/ipfs/{cid}"
 
 
 def mime_of(data):
@@ -86,7 +87,7 @@ def point_json(date, cid, mime):
     if not path.exists():
         return False
     meta = json.loads(path.read_text())
-    want = f"ipfs://{cid}"
+    want = GATEWAY.format(cid=cid)
     if meta.get("image") == want:
         return False
     meta["image"] = want
@@ -124,7 +125,7 @@ def main():
                     path = DAYS / f"{date}.json"
                     if path.exists():
                         meta = json.loads(path.read_text())
-                        if meta.get("image") == f"ipfs://{entry['cid']}":
+                        if meta.get("image") == GATEWAY.format(cid=entry['cid']) or meta.get("image") == f"ipfs://{entry['cid']}":
                             meta["image"] = HTTPS.format(date=date)
                             path.write_text(json.dumps(meta))
                             changed += 1
@@ -136,7 +137,7 @@ def main():
             time.sleep(0.5)
         if point_json(date, entry["cid"], entry.get("mime", mime)):
             changed += 1
-            print(f"{date}: json -> ipfs://{entry['cid']}")
+            print(f"{date}: json -> {GATEWAY.format(cid=entry['cid'])}")
     INDEX.write_text(json.dumps(index, indent=1, sort_keys=True) + "\n")
     print(f"changes: {changed}")
 
